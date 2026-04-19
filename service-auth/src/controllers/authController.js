@@ -29,10 +29,11 @@ const register = async (req, res) => {
     res.status(201).json({
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        goal: user.goal,
+        id:        user._id,
+        name:      user.name,
+        email:     user.email,
+        goal:      user.goal,
+        createdAt: user.createdAt,   // ← added: Dashboard uses this for "Day X of 180"
       },
     });
   } catch (err) {
@@ -59,10 +60,11 @@ const login = async (req, res) => {
     res.json({
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        goal: user.goal,
+        id:        user._id,
+        name:      user.name,
+        email:     user.email,
+        goal:      user.goal,
+        createdAt: user.createdAt,   // ← added: Dashboard uses this for "Day X of 180"
       },
     });
   } catch (err) {
