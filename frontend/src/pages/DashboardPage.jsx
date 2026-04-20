@@ -298,11 +298,13 @@ export default function DashboardPage() {
               </div>
 
               {/* ── 3. AI career suggestion ── */}
-              <div style={{ ...card, transition: 'background 0.3s, border 0.3s' }}>
-                <SectionTitle icon="🤖" bg="rgba(139,92,246,0.1)" title="AI career suggestion" t={t} />
+              <div style={{ ...card, transition: 'background 0.3s, border 0.3s', display: 'flex', flexDirection: 'column' }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: t.text1 }}>
+                  AI career suggestion
+                </h2>
 
                 {careerMatches.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <div style={{ textAlign: 'center', padding: '24px 0', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{ fontSize: 28, marginBottom: 8 }}>🎯</div>
                     <p style={{ fontSize: 12, color: t.text2 }}>No career data yet.</p>
                     <p style={{ fontSize: 11, color: t.text3, marginTop: 4 }}>
@@ -310,37 +312,37 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 ) : (
-                  <>
-                    <div style={{ fontSize: 36, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: '#10b981' }}>
-                      {topMatch.pct}%
-                    </div>
-                    <p style={{ fontSize: 11, color: t.text2, marginBottom: 14 }}>match based on your skills</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <p style={{ fontSize: 13, color: t.text2, marginBottom: 16, lineHeight: 1.4 }}>
+                      Based on your skills, you are a strong match for:
+                    </p>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {careerMatches.map((c, i) => (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+                      {careerMatches.slice(0, 3).map((c, i) => (
                         <div key={c.title} style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 14px', borderRadius: 10,
-                          background: i === 0
-                            ? (isDark ? 'rgba(79,142,247,0.08)' : 'rgba(79,142,247,0.05)')
-                            : t.surface2,
-                          border: `1px solid ${i === 0 ? 'rgba(79,142,247,0.25)' : t.border}`,
-                          fontSize: 12,
+                          fontSize: i === 0 ? 14 : 13,
+                          fontWeight: i === 0 ? 600 : 400,
+                          color: i === 0 ? t.text1 : t.text2,
                         }}>
-                          <div>
-                            <div style={{ fontWeight: 600, color: t.text1 }}>{c.title}</div>
-                            <div style={{ fontSize: 10, color: t.text2, marginTop: 1 }}>{c.sub}</div>
-                          </div>
-                          <div style={{
-                            fontFamily: "'JetBrains Mono',monospace", fontWeight: 600,
-                            color: i === 0 ? '#10b981' : i === 1 ? '#4f8ef7' : '#64748b',
-                          }}>
-                            {c.pct}%
-                          </div>
+                          {c.title}
                         </div>
                       ))}
                     </div>
-                  </>
+
+                    <div style={{ marginTop: 'auto' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        background: isDark ? 'rgba(79,142,247,0.15)' : '#e0f2fe',
+                        color: isDark ? '#60a5fa' : '#0284c7',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '4px 12px',
+                        borderRadius: 20,
+                      }}>
+                        {topMatch.pct}% match
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
 
