@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Sidebar from '../components/shared/Sidebar'
 import { generateLearningPath, generateCareerSuggestions, getSavedCareer } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -6,30 +6,35 @@ import Loader from '../components/shared/Loader'
 
 export default function CareerPage() {
   const { user } = useAuth()
-  const [skills, setSkills]           = useState('')
-  const [interests, setInterests]     = useState('')
+  const [skills, setSkills]             = useState('')
+  const [interests, setInterests]       = useState('')
   const [learningPath, setLearningPath] = useState('')
-  const [suggestions, setSuggestions] = useState('')
-  const [loading, setLoading]         = useState(false)
-  const [tab, setTab]                 = useState('path')
-  const [fetching, setFetching]       = useState(true)
-  const [error, setError]             = useState('')   // ← show AI errors in UI, not alert()
+  const [suggestions, setSuggestions]   = useState('')
+  const [careerMatches, setCareerMatches] = useState([])  // ✅ store matches for dashboard
+  const [loading, setLoading]           = useState(false)
+  const [tab, setTab]                   = useState('path')
+  const [fetching, setFetching]         = useState(true)
+  const [error, setError]               = useState('')
+
+  // ✅ FIX: prevent double API calls
+  const isCallingRef = useRef(false)
 
   useEffect(() => {
     getSavedCareer()
       .then(res => {
-        // Backend now always returns 200 with empty fields for new users
         setLearningPath(res.data.learningPath || '')
+        // ✅ FIX: was setting raw object — now correctly reads the string field
         setSuggestions(res.data.careerSuggestions || '')
+        setCareerMatches(res.data.careerMatches || [])
         setSkills(res.data.skills?.join(', ') || '')
       })
-      .catch(() => {
-        // Still silently ignore — user just starts fresh
-      })
+      .catch(() => {})
       .finally(() => setFetching(false))
   }, [])
 
   const handleGeneratePath = async () => {
+    if (isCallingRef.current || loading) return   // ✅ prevent double call
+    isCallingRef.current = true
     setLoading(true)
     setError('')
     try {
@@ -37,17 +42,20 @@ export default function CareerPage() {
         goal: user?.goal || 'Full-stack Developer',
         skills: skills.split(',').map(s => s.trim()).filter(Boolean),
       })
-      setLearningPath(res.data.learningPath)
+      // ✅ FIX: explicitly read .learningPath string from response
+      setLearningPath(res.data.learningPath || '')
     } catch (err) {
-      // Show the real error message from backend instead of generic alert
       const msg = err.response?.data?.message || 'AI request failed. Check your API key and billing.'
       setError(msg)
     } finally {
       setLoading(false)
+      isCallingRef.current = false
     }
   }
 
   const handleGenerateSuggestions = async () => {
+    if (isCallingRef.current || loading) return   // ✅ prevent double call
+    isCallingRef.current = true
     setLoading(true)
     setError('')
     try {
@@ -55,12 +63,16 @@ export default function CareerPage() {
         skills: skills.split(',').map(s => s.trim()).filter(Boolean),
         interests,
       })
-      setSuggestions(res.data.careerSuggestions)
+      // ✅ FIX: was `res.data` (whole object) — now correctly reads the string field
+      setSuggestions(res.data.careerSuggestions || '')
+      // ✅ also store careerMatches so dashboard shows them on next visit
+      setCareerMatches(res.data.careerMatches || [])
     } catch (err) {
       const msg = err.response?.data?.message || 'AI request failed. Check your API key and billing.'
       setError(msg)
     } finally {
       setLoading(false)
+      isCallingRef.current = false
     }
   }
 
@@ -71,17 +83,14 @@ export default function CareerPage() {
         <h1 className="text-lg font-medium text-slate-900 mb-1">AI Career Guide</h1>
         <p className="text-sm text-slate-500 mb-5">Get personalized learning paths and career suggestions</p>
 
-        {/* ── Error banner — only shows when AI fails ── */}
+        {/* ── Error banner ── */}
         {error && (
           <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2">
             <span>⚠️</span>
             <div>
               <strong>Error: </strong>{error}
               <div className="mt-1 text-red-500 text-xs">
-                Check your OpenAI API key and billing at{' '}
-                <a href="https://platform.openai.com/billing" target="_blank" rel="noreferrer" className="underline">
-                  platform.openai.com/billing
-                </a>
+                Check your Groq API key in your .env file.
               </div>
             </div>
           </div>
@@ -192,9 +201,44 @@ export default function CareerPage() {
               {fetching ? (
                 <Loader />
               ) : suggestions ? (
-                <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">
-                  {suggestions}
-                </pre>
+                <>
+                  {/* ✅ Properly rendered suggestion text */}
+                  <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-sans mb-5">
+                    {suggestions}
+                  </pre>
+
+                  {/* ✅ Career match cards — shown when available */}
+                  {careerMatches.length > 0 && (
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                        Your top career matches
+                      </h3>
+                      <div className="flex flex-col gap-2">
+                        {careerMatches.map((c, i) => (
+                          <div
+                            key={c.title}
+                            className="flex items-center justify-between px-4 py-3 rounded-lg border"
+                            style={{
+                              background: i === 0 ? 'rgba(79,142,247,0.05)' : '#f8fafc',
+                              borderColor: i === 0 ? 'rgba(79,142,247,0.25)' : '#e2e8f0',
+                            }}
+                          >
+                            <div>
+                              <div className="text-sm font-semibold text-slate-800">{c.title}</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{c.sub}</div>
+                            </div>
+                            <div
+                              className="text-sm font-bold font-mono"
+                              style={{ color: i === 0 ? '#10b981' : i === 1 ? '#4f8ef7' : '#94a3b8' }}
+                            >
+                              {c.pct}%
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-10">
                   <div className="text-3xl mb-2">🎯</div>
