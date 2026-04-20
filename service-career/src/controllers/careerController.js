@@ -53,7 +53,11 @@ const generateLearningPath = async (req, res) => {
 
 Output this exact structure:
 {
-  "learningPath": "Step 1: ...\nStep 2: ...\nStep 3: ...\nStep 4: ...\nStep 5: ...",
+  "learningPath": [
+    "Step 1: ...",
+    "Step 2: ...",
+    "Step 3: ..."
+  ],
   "skillProgress": [
     {"name": "JavaScript", "pct": 70},
     {"name": "React", "pct": 50},
@@ -65,7 +69,7 @@ Goal: ${goal}
 Current skills: ${skillList.length ? skillList.join(', ') : 'none listed'}
 
 Rules:
-- learningPath must be a plain text string with \\n between steps, NOT nested JSON
+- learningPath must be an array of strings, each representing a step
 - skillProgress must be an array of 4-6 objects with "name" (string) and "pct" (integer 0-100)
 - Include provided skills with realistic proficiency + 2-3 skills they need to learn at pct 10-20
 - Output ONLY the JSON object above, nothing else`
@@ -93,7 +97,9 @@ Rules:
       }
     }
 
-    const learningPath  = parsed.learningPath || raw
+    const learningPath = Array.isArray(parsed.learningPath)
+      ? parsed.learningPath.join('\n')
+      : (parsed.learningPath || raw)
     const skillProgress =
       Array.isArray(parsed.skillProgress) && parsed.skillProgress.length > 0
         ? parsed.skillProgress
@@ -127,7 +133,11 @@ const generateCareerSuggestions = async (req, res) => {
 
 Output this exact structure:
 {
-  "careerSuggestions": "Career 1: ...\n\nCareer 2: ...\n\nCareer 3: ...",
+  "careerSuggestions": [
+    "Career 1: ...",
+    "Career 2: ...",
+    "Career 3: ..."
+  ],
   "careerMatches": [
     {"title": "Job Title", "sub": "Short reason", "pct": 85},
     {"title": "Job Title", "sub": "Short reason", "pct": 74},
@@ -139,7 +149,7 @@ Skills: ${skillList.length ? skillList.join(', ') : 'not specified'}
 Interests: ${interests || 'not specified'}
 
 Rules:
-- careerSuggestions: plain text string describing 3 career paths
+- careerSuggestions: an array of strings, each describing a career path
 - careerMatches: exactly 3 objects sorted by pct descending
 - pct must be an integer number, not a string
 - Output ONLY the JSON object above, nothing else`
@@ -164,7 +174,9 @@ Rules:
       parsed = { careerSuggestions: raw, careerMatches: [] }
     }
 
-    const careerSuggestions = parsed.careerSuggestions || raw
+    const careerSuggestions = Array.isArray(parsed.careerSuggestions)
+      ? parsed.careerSuggestions.join('\n\n')
+      : (parsed.careerSuggestions || raw)
     const careerMatches = Array.isArray(parsed.careerMatches) ? parsed.careerMatches : []
 
     console.log('✅ Saving careerMatches:', JSON.stringify(careerMatches))
