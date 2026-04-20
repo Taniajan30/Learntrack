@@ -60,7 +60,11 @@ const generateLearningPath = async (req, res) => {
 Output ONLY a raw JSON object. No markdown. No explanation. No wrapping quotes. Just the JSON.
 
 {
-  "learningPath": "Step 1: ...\nStep 2: ...\nStep 3: ...\nStep 4: ...\nStep 5: ...",
+  "learningPath": [
+    "Step 1: ...",
+    "Step 2: ...",
+    "Step 3: ..."
+  ],
   "skillProgress": [
     {"name": "JavaScript", "pct": 70},
     {"name": "React", "pct": 50},
@@ -72,10 +76,10 @@ Goal: ${goal}
 Current skills: ${skillList.length ? skillList.join(', ') : 'none listed'}
 
 Rules:
-- learningPath: plain string with literal \\n between steps
-- skillProgress: 4-6 objects, "name" string, "pct" integer 0-100
-- Known skills get realistic pct, new skills get 10-20
-- Output ONLY the JSON object, nothing else, no wrapping`
+- learningPath must be a plain text string with \\n between steps, NOT nested JSON
+- skillProgress must be an array of 4-6 objects with "name" (string) and "pct" (integer 0-100)
+- Include provided skills with realistic proficiency + 2-3 skills they need to learn at pct 10-20
+- Output ONLY the JSON object above, nothing else`
 
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
@@ -100,7 +104,9 @@ Rules:
       }
     }
 
-    const learningPath  = parsed.learningPath || raw
+    const learningPath = Array.isArray(parsed.learningPath)
+      ? parsed.learningPath.join('\n')
+      : (parsed.learningPath || raw)
     const skillProgress =
       Array.isArray(parsed.skillProgress) && parsed.skillProgress.length > 0
         ? parsed.skillProgress
@@ -134,7 +140,7 @@ const generateCareerSuggestions = async (req, res) => {
 Output ONLY a raw JSON object. No markdown. No explanation. No wrapping quotes. Just the JSON.
 
 {
-  "careerSuggestions": "Career 1: Title\nDescription here.\n\nCareer 2: Title\nDescription here.\n\nCareer 3: Title\nDescription here.",
+  "careerSuggestions": "Career 1: ...\n\nCareer 2: ...\n\nCareer 3: ...",
   "careerMatches": [
     {"title": "Job Title Here", "sub": "Short one-line reason", "pct": 85},
     {"title": "Job Title Here", "sub": "Short one-line reason", "pct": 74},
@@ -146,10 +152,10 @@ Skills: ${skillList.length ? skillList.join(', ') : 'not specified'}
 Interests: ${interests || 'not specified'}
 
 Rules:
-- careerSuggestions: plain text string, use literal newlines
-- careerMatches: exactly 3 objects, sorted by pct descending
-- pct must be a plain integer (not a string)
-- Output ONLY the JSON object above, nothing else, no wrapping`
+- careerSuggestions: plain text string describing 3 career paths
+- careerMatches: exactly 3 objects sorted by pct descending
+- pct must be an integer number, not a string
+- Output ONLY the JSON object above, nothing else`
 
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
@@ -180,9 +186,7 @@ Rules:
     }
 
     const careerSuggestions = parsed.careerSuggestions || raw
-    const careerMatches = Array.isArray(parsed.careerMatches) && parsed.careerMatches.length > 0
-      ? parsed.careerMatches
-      : []
+    const careerMatches = Array.isArray(parsed.careerMatches) ? parsed.careerMatches : []
 
     console.log('✅ Saving careerMatches:', JSON.stringify(careerMatches))
 
