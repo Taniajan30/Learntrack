@@ -16,7 +16,6 @@ export default function CareerPage() {
   const [fetching, setFetching]         = useState(true)
   const [error, setError]               = useState('')
 
-  // ✅ FIX: prevent double API calls
   const isCallingRef = useRef(false)
 
   useEffect(() => {
@@ -33,7 +32,7 @@ export default function CareerPage() {
   }, [])
 
   const handleGeneratePath = async () => {
-    if (isCallingRef.current || loading) return   // ✅ prevent double call
+    if (isCallingRef.current || loading) return   
     isCallingRef.current = true
     setLoading(true)
     setError('')
@@ -42,7 +41,6 @@ export default function CareerPage() {
         goal: user?.goal || 'Full-stack Developer',
         skills: skills.split(',').map(s => s.trim()).filter(Boolean),
       })
-      // ✅ FIX: explicitly read .learningPath string from response
       setLearningPath(res.data.learningPath || '')
     } catch (err) {
       const msg = err.response?.data?.message || 'AI request failed. Check your API key and billing.'
@@ -63,7 +61,6 @@ export default function CareerPage() {
         skills: skills.split(',').map(s => s.trim()).filter(Boolean),
         interests,
       })
-      // ✅ FIX: was `res.data` (whole object) — now correctly reads the string field
       setSuggestions(res.data.careerSuggestions || '')
       // ✅ also store careerMatches so dashboard shows them on next visit
       setCareerMatches(res.data.careerMatches || [])
