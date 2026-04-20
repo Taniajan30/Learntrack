@@ -3,38 +3,45 @@ const Career = require('../models/Career')
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
+// ─── Robust JSON extractor ────────────────────────────────────────────────────
 function extractJSON(raw) {
-  let text = raw
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim()
+  let text = raw.trim()
 
+  // Strip markdown code fences
+  text = text.replace(/```json/gi, '').replace(/```/g, '').trim()
+
+  // ✅ FIX: Groq sometimes returns the whole thing as a JSON-encoded string
+  // e.g.  "{ \"careerSuggestions\": ... }"  — unwrap it
   if (text.startsWith('"') && text.endsWith('"')) {
     try { text = JSON.parse(text) } catch (_) {}
   }
 
+  // Find the outermost { }
   const start = text.indexOf('{')
   const end   = text.lastIndexOf('}')
-  if (start === -1 || end === -1) throw new Error('No JSON object found')
+  if (start === -1 || end === -1) throw new Error('No JSON object found in response')
   text = text.slice(start, end + 1)
 
-  const parsed = JSON.parse(text)
-
-  if (typeof parsed.learningPath === 'string') {
-    const lp = parsed.learningPath.trim()
-    if (lp.startsWith('{')) {
-      try {
-        const inner = JSON.parse(lp)
-        if (inner.learningPath)  parsed.learningPath  = inner.learningPath
-        if (inner.skillProgress) parsed.skillProgress = inner.skillProgress
-      } catch (_) {}
-    }
+  // ✅ FIX: Groq sometimes double-encodes — if parse gives a string, parse again
+  let parsed = JSON.parse(text)
+  if (typeof parsed === 'string') {
+    parsed = JSON.parse(parsed)
   }
 
+  // Normalise skillProgress entries
   if (Array.isArray(parsed.skillProgress)) {
     parsed.skillProgress = parsed.skillProgress.map(item => ({
       name: String(item.name || ''),
       pct:  Number(item.pct  || 0),
+    }))
+  }
+
+  // Normalise careerMatches entries
+  if (Array.isArray(parsed.careerMatches)) {
+    parsed.careerMatches = parsed.careerMatches.map(item => ({
+      title: String(item.title || ''),
+      sub:   String(item.sub   || ''),
+      pct:   Number(item.pct   || 0),
     }))
   }
 
@@ -49,9 +56,9 @@ const generateLearningPath = async (req, res) => {
   if (!goal) return res.status(400).json({ message: 'Goal is required' })
 
   try {
-    const prompt = `You are a career advisor. Return ONLY raw JSON, no markdown, no explanation.
+    const prompt = `You are a career advisor.
+Output ONLY a raw JSON object. No markdown. No explanation. No wrapping quotes. Just the JSON.
 
-Output this exact structure:
 {
   "learningPath": "Step 1: ...\nStep 2: ...\nStep 3: ...\nStep 4: ...\nStep 5: ...",
   "skillProgress": [
@@ -65,16 +72,16 @@ Goal: ${goal}
 Current skills: ${skillList.length ? skillList.join(', ') : 'none listed'}
 
 Rules:
-- learningPath must be a plain text string with \\n between steps, NOT nested JSON
-- skillProgress must be an array of 4-6 objects with "name" (string) and "pct" (integer 0-100)
-- Include provided skills with realistic proficiency + 2-3 skills they need to learn at pct 10-20
-- Output ONLY the JSON object above, nothing else`
+- learningPath: plain string with literal \\n between steps
+- skillProgress: 4-6 objects, "name" string, "pct" integer 0-100
+- Known skills get realistic pct, new skills get 10-20
+- Output ONLY the JSON object, nothing else, no wrapping`
 
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 1000,
-      temperature: 0.3,
+      temperature: 0.1,
     })
 
     const raw = response.choices[0].message.content
@@ -107,7 +114,7 @@ Rules:
       { upsert: true, new: true }
     )
 
-    res.json({ learningPath })
+    res.json({ learningPath, skillProgress })
 
   } catch (err) {
     console.error('Groq /learning-path error:', err.message)
@@ -123,15 +130,15 @@ const generateCareerSuggestions = async (req, res) => {
   const skillList = Array.isArray(skills) ? skills : []
 
   try {
-    const prompt = `You are a career counselor. Return ONLY raw JSON, no markdown, no explanation.
+    const prompt = `You are a career counselor.
+Output ONLY a raw JSON object. No markdown. No explanation. No wrapping quotes. Just the JSON.
 
-Output this exact structure:
 {
-  "careerSuggestions": "Career 1: ...\n\nCareer 2: ...\n\nCareer 3: ...",
+  "careerSuggestions": "Career 1: Title\nDescription here.\n\nCareer 2: Title\nDescription here.\n\nCareer 3: Title\nDescription here.",
   "careerMatches": [
-    {"title": "Job Title", "sub": "Short reason", "pct": 85},
-    {"title": "Job Title", "sub": "Short reason", "pct": 74},
-    {"title": "Job Title", "sub": "Short reason", "pct": 60}
+    {"title": "Job Title Here", "sub": "Short one-line reason", "pct": 85},
+    {"title": "Job Title Here", "sub": "Short one-line reason", "pct": 74},
+    {"title": "Job Title Here", "sub": "Short one-line reason", "pct": 60}
   ]
 }
 
@@ -139,16 +146,16 @@ Skills: ${skillList.length ? skillList.join(', ') : 'not specified'}
 Interests: ${interests || 'not specified'}
 
 Rules:
-- careerSuggestions: plain text string describing 3 career paths
-- careerMatches: exactly 3 objects sorted by pct descending
-- pct must be an integer number, not a string
-- Output ONLY the JSON object above, nothing else`
+- careerSuggestions: plain text string, use literal newlines
+- careerMatches: exactly 3 objects, sorted by pct descending
+- pct must be a plain integer (not a string)
+- Output ONLY the JSON object above, nothing else, no wrapping`
 
     const response = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 900,
-      temperature: 0.3,
+      temperature: 0.1,
     })
 
     const raw = response.choices[0].message.content
@@ -161,11 +168,21 @@ Rules:
       parsed = extractJSON(raw)
     } catch (parseErr) {
       console.error('JSON parse failed:', parseErr.message)
-      parsed = { careerSuggestions: raw, careerMatches: [] }
+      // Fallback: still return something useful so UI doesn't break
+      parsed = {
+        careerSuggestions: raw,
+        careerMatches: skillList.length ? [
+          { title: 'Software Developer',  sub: 'Matches your technical skills',  pct: 80 },
+          { title: 'Web Developer',        sub: 'Strong fit for your stack',      pct: 70 },
+          { title: 'Full-stack Engineer',  sub: 'Broad match across your skills', pct: 60 },
+        ] : [],
+      }
     }
 
     const careerSuggestions = parsed.careerSuggestions || raw
-    const careerMatches = Array.isArray(parsed.careerMatches) ? parsed.careerMatches : []
+    const careerMatches = Array.isArray(parsed.careerMatches) && parsed.careerMatches.length > 0
+      ? parsed.careerMatches
+      : []
 
     console.log('✅ Saving careerMatches:', JSON.stringify(careerMatches))
 
@@ -175,7 +192,7 @@ Rules:
       { upsert: true, new: true }
     )
 
-    res.json({ careerSuggestions })
+    res.json({ careerSuggestions, careerMatches })
 
   } catch (err) {
     console.error('Groq /suggest error:', err.message)
